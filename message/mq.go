@@ -1,36 +1,53 @@
-package mq
+package message
 
 import (
 	"context"
 	"errors"
 	"sync"
 	"time"
-
-	"github.com/amtoaer/bing-bong/client"
 )
 
-type Receiver struct {
-	userID  string
-	channel chan string
-	cancel  context.CancelFunc
+var (
+	instance *MessageQueue
+	once     sync.Once
+)
+
+func Default() *MessageQueue {
+	once.Do(func() { instance = New() })
+	return instance
 }
 
-func (r *Receiver) checkMessage(ctx context.Context) {
-	var msg string
-	for {
-		select {
-		case msg = <-r.channel:
-			go client.Robot.SendMessage(r.userID, msg)
-		case <-ctx.Done():
-			return
-		}
-	}
+func New() *MessageQueue {
+	return &MessageQueue{mq: make(map[string][]Receiver), exit: make(chan bool)}
+}
+
+type Receiver struct {
+	userID  int64
+	channel chan string
+	cancel  context.CancelFunc
+	isGroup bool // 是否为群聊
 }
 
 type MessageQueue struct {
 	mq   map[string][]Receiver
 	exit chan bool
 	lock sync.RWMutex
+}
+
+type messager interface {
+	SendMessage(userID int64, msg string, isGroup bool)
+}
+
+func (r *Receiver) checkMessage(bot messager, ctx context.Context) {
+	var msg string
+	for {
+		select {
+		case msg = <-r.channel:
+			go bot.SendMessage(r.userID, msg, r.isGroup)
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // 读消息队列
@@ -95,7 +112,7 @@ func (m *MessageQueue) broadcast(message string, receiverList []Receiver) {
 	}
 }
 
-func (m *MessageQueue) Subscribe(topic string, userID string) error {
+func (m *MessageQueue) Subscribe(bot messager, topic string, userID int64, isGroup bool) error {
 	receiverList := m.read(topic)
 	for _, receiver := range receiverList {
 		if receiver.userID == userID {
@@ -108,13 +125,14 @@ func (m *MessageQueue) Subscribe(topic string, userID string) error {
 		userID:  userID,
 		channel: channel,
 		cancel:  cancel,
+		isGroup: isGroup,
 	}
 	m.write(topic, receiver)
-	go receiver.checkMessage(ctx)
+	go receiver.checkMessage(bot, ctx)
 	return nil
 }
 
-func (m *MessageQueue) Unsubscribe(topic string, userID string) {
+func (m *MessageQueue) Unsubscribe(topic string, userID int64) {
 	if !m.checkStatus() {
 		return
 	}
