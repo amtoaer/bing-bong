@@ -1,0 +1,11 @@
+{
+    "botType": "qq",
+    "botUser": "123456",
+    "botPass": "123456",
+    "dbAddress": "127.0.0.1:3306",
+    "dbUser": "user",
+    "dbPass": "pass",
+    "dbName": "bingbong",
+    "checkTime": 5,
+    "checkRange": 5
+}
