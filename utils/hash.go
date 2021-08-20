@@ -8,6 +8,7 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
+// 取得feed条目的哈希值，防止重复推送
 func Hash(item *gofeed.Item) string {
 	var names []string
 	for _, author := range item.Authors {
