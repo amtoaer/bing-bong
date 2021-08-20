@@ -12,33 +12,37 @@ var (
 	once     sync.Once
 )
 
+// 返回默认MQ单例
 func Default() *MessageQueue {
 	once.Do(func() { instance = New() })
 	return instance
 }
 
+// 新建MQ
 func New() *MessageQueue {
-	return &MessageQueue{mq: make(map[string][]Receiver), exit: make(chan bool)}
+	return &MessageQueue{mq: make(map[string][]*Receiver), exit: make(chan bool)}
 }
 
 type Receiver struct {
-	userID  int64
-	channel chan string
-	cancel  context.CancelFunc
-	isGroup bool // 是否为群聊
+	userID  int64              // 接收者ID
+	channel chan string        // 消息载体
+	cancel  context.CancelFunc //取消消息监听协程
+	isGroup bool               // 是否为群聊
 }
 
 type MessageQueue struct {
-	mq   map[string][]Receiver
-	exit chan bool
-	lock sync.RWMutex
+	mq   map[string][]*Receiver //内部的订阅关系map
+	exit chan bool              // 退出信号
+	lock sync.RWMutex           // 保证mq协程安全的读写互斥锁
 }
 
-type messager interface {
+// 发信者只需要实现发送消息接口
+type Messager interface {
 	SendMessage(userID int64, msg string, isGroup bool)
 }
 
-func (r *Receiver) checkMessage(bot messager, ctx context.Context) {
+// 监听消息，如接收到消息则通过messager发送给指定user
+func (r *Receiver) checkMessage(bot Messager, ctx context.Context) {
 	var msg string
 	for {
 		select {
@@ -51,7 +55,7 @@ func (r *Receiver) checkMessage(bot messager, ctx context.Context) {
 }
 
 // 读消息队列
-func (m *MessageQueue) read(topic string) []Receiver {
+func (m *MessageQueue) read(topic string) []*Receiver {
 	m.lock.RLock()
 	receiverList := m.mq[topic]
 	m.lock.RUnlock()
@@ -59,14 +63,14 @@ func (m *MessageQueue) read(topic string) []Receiver {
 }
 
 // 写消息队列
-func (m *MessageQueue) write(topic string, receiverList ...Receiver) {
+func (m *MessageQueue) write(topic string, receiverList ...*Receiver) {
 	m.lock.Lock()
 	m.mq[topic] = append(m.mq[topic], receiverList...)
 	m.lock.Unlock()
 }
 
 // 覆写消息队列
-func (m *MessageQueue) overwrite(topic string, receiverList []Receiver) {
+func (m *MessageQueue) overwrite(topic string, receiverList []*Receiver) {
 	m.lock.Lock()
 	m.mq[topic] = receiverList
 	m.lock.Unlock()
@@ -75,7 +79,7 @@ func (m *MessageQueue) overwrite(topic string, receiverList []Receiver) {
 // 清空消息队列
 func (m *MessageQueue) clear() {
 	m.lock.Lock()
-	m.mq = make(map[string][]Receiver)
+	m.mq = make(map[string][]*Receiver)
 	m.lock.Unlock()
 }
 
@@ -89,6 +93,7 @@ func (m *MessageQueue) checkStatus() bool {
 	}
 }
 
+// 向消息队列推送消息
 func (m *MessageQueue) Publish(topic, message string) error {
 	if !m.checkStatus() {
 		return errors.New("message queue closed")
@@ -98,10 +103,11 @@ func (m *MessageQueue) Publish(topic, message string) error {
 	return nil
 }
 
-func (m *MessageQueue) broadcast(message string, receiverList []Receiver) {
-	alert := func(receiver Receiver) {
+// 内部的消息广播实现
+func (m *MessageQueue) broadcast(message string, receiverList []*Receiver) {
+	alert := func(receiver *Receiver) {
 		select {
-		case <-receiver.channel:
+		case receiver.channel <- message:
 		case <-time.After(10 * time.Second):
 		case <-m.exit:
 			return
@@ -112,7 +118,11 @@ func (m *MessageQueue) broadcast(message string, receiverList []Receiver) {
 	}
 }
 
-func (m *MessageQueue) Subscribe(bot messager, topic string, userID int64, isGroup bool) error {
+// 订阅topic（在订阅同时启动订阅者消息监听，故需要bot实例）
+func (m *MessageQueue) Subscribe(bot Messager, topic string, userID int64, isGroup bool) error {
+	if !m.checkStatus() {
+		return errors.New("message queue closed")
+	}
 	receiverList := m.read(topic)
 	for _, receiver := range receiverList {
 		if receiver.userID == userID {
@@ -121,7 +131,7 @@ func (m *MessageQueue) Subscribe(bot messager, topic string, userID int64, isGro
 	}
 	channel := make(chan string, 1)
 	ctx, cancel := context.WithCancel(context.Background())
-	receiver := Receiver{
+	receiver := &Receiver{
 		userID:  userID,
 		channel: channel,
 		cancel:  cancel,
@@ -132,6 +142,7 @@ func (m *MessageQueue) Subscribe(bot messager, topic string, userID int64, isGro
 	return nil
 }
 
+// 取消订阅topic
 func (m *MessageQueue) Unsubscribe(topic string, userID int64) {
 	if !m.checkStatus() {
 		return
@@ -146,6 +157,7 @@ func (m *MessageQueue) Unsubscribe(topic string, userID int64) {
 	}
 }
 
+// 关闭消息队列
 func (m *MessageQueue) Close() {
 	if !m.checkStatus() {
 		return
@@ -157,4 +169,15 @@ func (m *MessageQueue) Close() {
 		}
 	}
 	m.clear()
+}
+
+// 返回topic（即url）列表，供rss更新协程查询
+func (m *MessageQueue) GetUrls() []string {
+	var result []string
+	m.lock.RLock()
+	for url := range m.mq {
+		result = append(result, url)
+	}
+	m.lock.RUnlock()
+	return result
 }
