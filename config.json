@@ -1,10 +1,13 @@
 {
     "botType": "qq",
-    "botUser": "123456",
-    "botPass": "123456",
-    "dbAddress": "127.0.0.1:3306",
-    "dbUser": "user",
-    "dbPass": "pass",
+    "qq": {
+        "account": "123456",
+        "webSocket": "ws://127.0.0.1:6700/",
+        "accessToken": "123456"
+    },
+    "dbAddress": "localhost:3306",
+    "dbUser": "root",
+    "dbPass": "root",
     "dbName": "bingbong",
     "checkTime": 5,
     "checkRange": 5
