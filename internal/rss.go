@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/amtoaer/bing-bong/message"
@@ -11,6 +13,13 @@ import (
 )
 
 var fp *gofeed.Parser = gofeed.NewParser()
+
+func init() {
+	proxyUrl := viper.GetString("proxy")
+	if proxy, err := url.ParseRequestURI(proxyUrl); err == nil {
+		fp.Client = &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxy)}}
+	}
+}
 
 // 检测rss更新的定时任务
 func CheckMessage(mq *message.MessageQueue) {

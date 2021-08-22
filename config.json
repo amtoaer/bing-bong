@@ -8,6 +8,7 @@
     "dbAddress": "localhost:3306",
     "dbUser": "root",
     "dbPass": "root",
+    "proxy": "",
     "dbName": "bingbong",
     "checkTime": 5,
     "checkRange": 5
