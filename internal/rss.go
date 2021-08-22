@@ -10,14 +10,13 @@ import (
 	"github.com/spf13/viper"
 )
 
-var fp gofeed.Parser
+var fp *gofeed.Parser = gofeed.NewParser()
 
 // 检测rss更新的定时任务
-func CheckMessage() {
-	checkTime := viper.GetInt64("checkTime")
+func CheckMessage(mq *message.MessageQueue) {
+	checkTime := viper.GetInt64("checktime")
 	for range time.Tick(time.Duration(checkTime) * time.Minute) {
-		urls := message.Default().GetUrls()
-		mq := message.Default()
+		urls := mq.GetUrls()
 		for _, url := range urls {
 			go checkMessage(url, mq)
 		}
@@ -26,21 +25,28 @@ func CheckMessage() {
 
 func checkMessage(url string, mq *message.MessageQueue) {
 	feeds, err := fp.ParseURL(url)
-	utils.CheckError("error parsing urls: %v", err)
-	checkRange := max(feeds.Len(), viper.GetInt("checkRange")) //限制检测条数
+	if utils.Errorf("error parsing urls: %v", err) {
+		return
+	}
+	checkRange := min(feeds.Len(), viper.GetInt("checkrange")) //限制检测条数
 	for i := 0; i < checkRange; i++ {
 		feed := feeds.Items[i]
 		hash := utils.Hash(feed)
 		if !model.IsFeedExist(hash) {
-			mq.Publish(url, utils.BuildMessage(feed.Title, feed))
-			model.InsertFeed(url, hash)
+			mq.Publish(url, utils.BuildMessage(feeds.Title, feed))
+			model.InsertHash(url, hash)
 		}
 	}
 }
 
-func max(a, b int) int {
+func ParseTitle(url string) (string, error) {
+	feeds, err := fp.ParseURL(url)
+	return feeds.Title, err
+}
+
+func min(a, b int) int {
 	if a > b {
-		return a
+		return b
 	}
-	return b
+	return a
 }
