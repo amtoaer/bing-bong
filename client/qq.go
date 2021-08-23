@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"math/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +49,8 @@ func (q *QQ) Init() {
 
 // 发送消息
 func (q *QQ) SendMessage(userID int64, message string, isGroup bool) {
+	rand.Seed(time.Now().Unix())                              //设置随机数种子
+	time.Sleep(time.Duration(rand.Int63n(240)) * time.Second) //尝试随机sleep，降低风控风险
 	if isGroup {
 		q.bot.SendGroupMessage(userID, message)
 	} else {
