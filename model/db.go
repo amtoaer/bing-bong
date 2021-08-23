@@ -13,12 +13,12 @@ import (
 
 const (
 	queryHashSQL          = "select count(*) from hashes where hash = ?"
-	insertHashSQL         = "insert into hashes (url,hash) values (?,?)"
+	insertHashSQL         = "insert ignore into hashes (url,hash) values (?,?)"
 	querySubscriptionSQL  = "select url,subscriber,isGroup from subscriptions"
 	insertSubscriptionSQL = "insert into subscriptions (url,subscriber,isGroup) values (?,?,?)"
 	deleteSubscriptionSQL = "delete from subscriptions where url = ? and subscriber = ? and isGroup = ?"
 	queryFeedSQL          = "select f.url,f.name from feeds f join subscriptions s on f.url=s.url and s.subscriber = ?"
-	insertFeedSQL         = "insert ignore into feeds (url,name) values (?,?)"
+	insertFeedSQL         = "replace into feeds (url,name) values (?,?)"
 )
 
 var (

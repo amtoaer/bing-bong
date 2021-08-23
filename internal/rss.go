@@ -50,6 +50,11 @@ func checkMessage(url string, mq *message.MessageQueue) {
 
 func ParseTitle(url string) (string, error) {
 	feeds, err := fp.ParseURL(url)
+	checkRange := min(feeds.Len(), viper.GetInt("checkrange"))
+	// 在订阅时自动读取已存在的条目，避免多次推送
+	for i := 0; i < checkRange; i++ {
+		model.InsertHash(url, utils.Hash(feeds.Items[i]))
+	}
 	return feeds.Title, err
 }
 
