@@ -1,4 +1,4 @@
-<h1 align="center">- BING BONG- </h1>
+<h1 align="center">- BING BONG -</h1>
 <p align="center">
 <img src="./img/screenshot.png"/>
 </p>
@@ -34,6 +34,10 @@ checkRange: 5 # 检测rss订阅的最大条数（程序会检测rss地址的前m
 ```
 
 ## 运行
+
+前往[release 页面](https://github.com/amtoaer/bing-bong/releases)下载预编译版本（仅`linux_amd64`）或自己编译该程序，将程序文件与配置文件放置在相同目录下，即可运行启动。
+
+以下是针对特定客户端的说明：
 
 - QQ
 
