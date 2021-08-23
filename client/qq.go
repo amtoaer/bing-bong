@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/amtoaer/bing-bong/internal"
@@ -71,6 +72,7 @@ func (q *QQ) HandleEvent(mq *message.MessageQueue) {
 				ctx.Send("获取feeds信息中...")
 				title, err := internal.ParseTitle(cmd.Args)
 				if utils.Errorf("error getting feeds title:%v", err) {
+					ctx.Send("获取信息失败，请检查机器人网络并确保网址可达。")
 					return
 				}
 				isGroup, userID := getCtxInfo(ctx)
@@ -135,15 +137,16 @@ func getCtxInfo(ctx *zero.Ctx) (isGroup bool, userID int64) {
 }
 
 func buildMessage(feeds []*model.Feed, isQuery bool) (hasFeed bool, message string) {
+	var messages []string
 	if len(feeds) == 0 {
 		return
 	}
 	hasFeed = true
 	for index, feed := range feeds {
-		message += fmt.Sprintf("%d. %s \n", index+1, feed.Name)
+		messages = append(messages, fmt.Sprintf("%d. %s", index+1, feed.Name))
 	}
 	if !isQuery {
-		message += "请在十秒内输入您要取消的编号。"
+		messages = append(messages, "请在十秒内输入您要取消的编号。")
 	}
-	return
+	return hasFeed, strings.Join(messages, "\n")
 }
