@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"math/rand"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -11,7 +12,6 @@ import (
 	"github.com/amtoaer/bing-bong/message"
 	"github.com/amtoaer/bing-bong/model"
 	"github.com/amtoaer/bing-bong/utils"
-	"github.com/asaskevich/govalidator"
 	log "github.com/sirupsen/logrus"
 	zero "github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/driver"
@@ -69,16 +69,22 @@ func (q *QQ) HandleEvent(mq *message.MessageQueue) {
 		if cmd.Args == "" {
 			ctx.Send("请输入要订阅的链接！")
 		} else {
-			if !govalidator.IsURL(cmd.Args) {
+			if _, err := url.ParseRequestURI(cmd.Args); err != nil {
 				ctx.Send("请输入合法的链接！")
 			} else {
+				isGroup, userID := getCtxInfo(ctx)
+				for _, existFeed := range model.QueryFeed(userID) {
+					if cmd.Args == existFeed.Url {
+						ctx.Send("您已经订阅了该地址！")
+						return
+					}
+				}
 				ctx.Send("获取feeds信息中...")
 				title, err := internal.ParseTitle(cmd.Args)
 				if utils.Errorf("error getting feeds title:%v", err) {
-					ctx.Send("获取信息失败，请检查机器人网络并确保网址可达。")
+					ctx.Send("获取信息失败，请检查机器人网络并确保网址为rss地址。")
 					return
 				}
-				isGroup, userID := getCtxInfo(ctx)
 				mq.Subscribe(q, cmd.Args, userID, isGroup)
 				model.InsertSubscription(cmd.Args, title, userID, isGroup)
 				ctx.Send(fmt.Sprintf("订阅《%s》成功！", title))
