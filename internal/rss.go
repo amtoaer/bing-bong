@@ -50,6 +50,9 @@ func checkMessage(url string, mq *message.MessageQueue) {
 
 func ParseTitle(url string) (string, error) {
 	feeds, err := fp.ParseURL(url)
+	if err != nil {
+		return "", err
+	}
 	checkRange := min(feeds.Len(), viper.GetInt("checkrange"))
 	// 在订阅时自动读取已存在的条目，避免多次推送
 	for i := 0; i < checkRange; i++ {
