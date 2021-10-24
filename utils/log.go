@@ -21,3 +21,7 @@ func Errorf(msg string, errs ...error) bool {
 	}
 	return flag
 }
+
+func Fatal(msg ...interface{}) {
+	log.Fatal(msg)
+}

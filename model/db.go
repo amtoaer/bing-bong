@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
@@ -34,19 +35,56 @@ type Feed struct {
 // 初始化数据库链接
 func InitDB() {
 	var (
-		err  error
-		errs []error = make([]error, 7)
+		err             error
+		errs            []error = make([]error, 7)
+		dbType, address string
 	)
-	address := fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4",
-		viper.GetString("dbUser"), viper.GetString("dbPass"),
-		viper.GetString("dbAddress"), viper.GetString("dbName"))
-	innerDB, err = sql.Open("mysql", address)
-	if err != nil {
-		panic(fmt.Errorf("error opening db connection:%v", err))
+	switch viper.GetString("dbType") {
+	case "mysql":
+		{
+			dbType = "mysql"
+			conf := viper.GetStringMapString("mysql")
+			address = fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4",
+				conf["dbUser"], conf["dbPass"],
+				conf["dbAddress"], conf["dbName"])
+		}
+	case "sqlite":
+		{
+			dbType = "sqlite3"
+			conf := viper.GetStringMapString("sqlite")
+			address = conf["path"]
+		}
+	default:
+		utils.Fatal("unsupported db type")
 	}
-	if err = innerDB.Ping(); err != nil {
-		panic(fmt.Errorf("error ping db connection:%v", err))
-	}
+	innerDB, err = sql.Open(dbType, address)
+	utils.Fatalf("error opening db connection:%v", err)
+	utils.Fatalf("error ping db connection:%v", innerDB.Ping())
+	_, err = innerDB.Exec(`
+	CREATE TABLE IF NOT EXISTS feeds(
+		url VARCHAR(100) NOT NULL,
+		name VARCHAR(100) NOT NULL,
+		PRIMARY KEY(url)
+	)CHARSET = UTF8MB4;
+
+	CREATE TABLE IF NOT EXISTS subscriptions(
+		sid BIGINT AUTO_INCREMENT NOT NULL,
+		url VARCHAR(100) NOT NULL,
+		subscriber BIGINT NOT NULL,
+		isGroup BOOLEAN NOT NULL,
+		PRIMARY KEY(sid),
+		FOREIGN KEY(url) REFERENCES feeds(url)
+	)CHARSET = UTF8MB4;
+
+	CREATE TABLE IF NOT EXISTS hashes(
+		fid BIGINT AUTO_INCREMENT NOT NULL,
+		url VARCHAR(100) NOT NULL,
+		hash VARCHAR(100) NOT NULL,
+		PRIMARY KEY(fid),
+		FOREIGN KEY(url) REFERENCES feeds(url)
+	)CHARSET = UTF8MB4;
+	`)
+	utils.Fatalf("error init db table:%v", err)
 	queryHash, errs[0] = innerDB.Prepare(queryHashSQL)
 	insertHash, errs[1] = innerDB.Prepare(insertHashSQL)
 	querySubscription, errs[2] = innerDB.Prepare(querySubscriptionSQL)
