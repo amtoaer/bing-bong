@@ -3,7 +3,7 @@ qq:
   account: "123456" # QQ账号
   webSocket: "ws://127.0.0.1:6700/" #cq-http的正向ws地址
   accessToken: "123456" # cq-http的token
-dbType: "mysql" # 数据库类型
+dbType: "sqlite" # 数据库类型
 mysql:
   dbAddress: "localhost:3306" # 数据库链接（目前仅支持mysql）
   dbUser: "root" # 数据库账号

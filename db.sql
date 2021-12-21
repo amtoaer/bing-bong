@@ -1,2 +1,0 @@
-DROP DATABASE IF EXISTS bingbong;
-CREATE DATABASE bingbong;
