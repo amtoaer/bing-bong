@@ -13,7 +13,6 @@ type Messager interface {
 type Receiver struct {
 	userID  int64       // 接收者ID
 	isGroup bool        // 是否为群聊
-	count   int         // 该用户的订阅数量
 	channel chan string // 消息载体
 }
 
