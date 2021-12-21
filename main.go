@@ -4,6 +4,7 @@ import (
 	"github.com/amtoaer/bing-bong/client"
 	"github.com/amtoaer/bing-bong/internal"
 	"github.com/amtoaer/bing-bong/message"
+	"github.com/amtoaer/bing-bong/model"
 	"github.com/spf13/viper"
 )
 
@@ -27,7 +28,9 @@ func main() {
 	}
 	// 登录机器人
 	bot.Init()
-	// 从数据库读取订阅信息初始化消息队列
+	// 初始化数据库链接
+	model.InitDB()
+	// 从数据库读取订阅信息初始化消息队列，同时启动消息监听
 	mm.Init(bot)
 	// 开始检测rss更新
 	go internal.CheckMessage(mm)

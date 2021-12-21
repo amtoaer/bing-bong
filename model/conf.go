@@ -1,7 +1,7 @@
 package model
 
 import (
-	"fmt"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/spf13/viper"
 )
@@ -11,7 +11,6 @@ func init() {
 	viper.SetConfigName("config")
 	viper.AddConfigPath(".")
 	if err := viper.ReadInConfig(); err != nil {
-		panic(fmt.Errorf("error reading config file: %v", err))
+		log.Fatalf("读取配置文件失败：%v", err)
 	}
-	InitDB()
 }
