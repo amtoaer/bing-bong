@@ -3,7 +3,7 @@ package model
 import (
 	"fmt"
 
-	"github.com/amtoaer/bing-bong/utils"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
@@ -33,15 +33,15 @@ func InitDB() {
 			dialector = sqlite.Open(conf["path"])
 		}
 	default:
-		utils.Fatal("unsupported db type")
+		log.Fatal("不支持的数据库类型")
 	}
 	db, err = gorm.Open(dialector, &gorm.Config{})
 	if err != nil {
-		utils.Fatal("failed to open database")
+		log.Fatalf("打开数据库失败：%v", err)
 	}
 	db.AutoMigrate(&User{}, &Feed{}, &Summary{})
 	if err != nil {
-		utils.Fatal("failed to migrate database")
+		log.Fatalf("初始化数据库失败：%v", err)
 	}
 }
 
@@ -63,7 +63,13 @@ func QueryFeed(account int64) (result []*Feed) {
 	return result
 }
 
-// 添加订阅
+// 查询带有订阅关系的用户列表
+func QueryUser() (users []User) {
+	db.Preload("Feeds").Find(&users)
+	return
+}
+
+// 插入订阅关系
 func InsertSubscription(url, name string, account int64, isGroup bool) error {
 	return db.Where(&User{
 		Account: account,
@@ -74,7 +80,7 @@ func InsertSubscription(url, name string, account int64, isGroup bool) error {
 	})
 }
 
-// 删除订阅
+// 删除订阅关系
 func DeleteSubscription(url string, account int64, isGroup bool) {
 	db.Where(&User{
 		Account: account,

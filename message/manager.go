@@ -31,6 +31,17 @@ func DefaultManager() *Manager {
 	return mm
 }
 
+func (m *Manager) Init(bot Messager) {
+	m.bot = bot
+	users := model.QueryUser()
+	for i := range users {
+		user := users[i]
+		for j := range user.Feeds {
+			m.Subscribe(user.Feeds[j].URL, &user)
+		}
+	}
+}
+
 func (m *Manager) Publish(topic, message string) error {
 	return m.mq.Publish(topic, message)
 }
@@ -56,8 +67,4 @@ func (m *Manager) UnSubscribe(topic string, user *model.User) error {
 
 func (m *Manager) GetTopics() []string {
 	return m.mq.GetTopics()
-}
-
-func (m *Manager) RegisterBot(bot Messager) {
-	m.bot = bot
 }

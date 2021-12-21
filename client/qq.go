@@ -11,7 +11,6 @@ import (
 	"github.com/amtoaer/bing-bong/internal"
 	"github.com/amtoaer/bing-bong/message"
 	"github.com/amtoaer/bing-bong/model"
-	"github.com/amtoaer/bing-bong/utils"
 	log "github.com/sirupsen/logrus"
 	zero "github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/driver"
@@ -37,20 +36,22 @@ func (q *QQ) Init() {
 		SelfID: account,
 	})
 	accountNum, err := strconv.ParseInt(account, 10, 64)
-	utils.Fatalf("error parsing account:%v", err)
-	time.Sleep(1 * time.Second) // zero内部的机器人注册是异步的，这里暂且使用sleep等待1s，防止zero.GetBot为nil
+	if err != nil {
+		log.Fatalf("解析账号失败：%v", err)
+	}
+	time.Sleep(100 * time.Millisecond) // zero内部的机器人注册是异步的，这里暂且使用sleep等待0.1s，防止zero.GetBot为nil
 	q.bot = zero.GetBot(accountNum)
 	if q.bot != nil {
 		log.Info("机器人成功启动")
 	} else {
-		log.Fatalf("机器人启动失败") //如果启动失败可以适当延长上面的sleep时间试试（（
+		log.Fatal("机器人启动失败")
 	}
 }
 
 // 发送消息
 func (q *QQ) SendMessage(userID int64, message string, isGroup bool) {
 	rand.Seed(time.Now().Unix())                             //设置随机数种子
-	time.Sleep(time.Duration(rand.Int63n(30)) * time.Second) //尝试随机sleep，降低风控风险
+	time.Sleep(time.Duration(rand.Int63n(30)) * time.Second) //尝试随机sleep，或可降低风控风险
 	if isGroup {
 		q.bot.SendGroupMessage(userID, message)
 	} else {
@@ -59,11 +60,12 @@ func (q *QQ) SendMessage(userID int64, message string, isGroup bool) {
 }
 
 // 监听事件并阻塞程序
-func (q *QQ) HandleEvent(mq *message.MessageQueue) {
+func (q *QQ) HandleEvent(mm *message.Manager) {
 	zero.OnCommandGroup([]string{"订阅", "subscribe"}).Handle(func(ctx *zero.Ctx) {
 		var cmd extension.CommandModel
 		err := ctx.Parse(&cmd)
-		if utils.Errorf("处理命令时发生错误：%v", err) {
+		if err != nil {
+			log.Errorf("处理命令失败：%v", err)
 			return
 		}
 		if cmd.Args == "" {
@@ -74,18 +76,19 @@ func (q *QQ) HandleEvent(mq *message.MessageQueue) {
 			} else {
 				isGroup, userID := getCtxInfo(ctx)
 				for _, existFeed := range model.QueryFeed(userID) {
-					if cmd.Args == existFeed.Url {
+					if cmd.Args == existFeed.URL {
 						ctx.Send("您已经订阅了该地址！")
 						return
 					}
 				}
 				ctx.Send("获取feeds信息中...")
 				title, err := internal.ParseTitle(cmd.Args)
-				if utils.Errorf("error getting feeds title:%v", err) {
+				if err != nil {
+					log.Errorf("获取订阅标题失败：%v", err)
 					ctx.Send("获取信息失败，请检查机器人网络并确保网址为rss地址。")
 					return
 				}
-				mq.Subscribe(q, cmd.Args, userID, isGroup)
+				mm.Subscribe(cmd.Args, &model.User{Account: userID, IsGroup: isGroup})
 				model.InsertSubscription(cmd.Args, title, userID, isGroup)
 				ctx.Send(fmt.Sprintf("订阅《%s》成功！", title))
 			}
@@ -109,8 +112,8 @@ func (q *QQ) HandleEvent(mq *message.MessageQueue) {
 				} else {
 					num -= 1
 					if num >= 0 && num < len(feeds) {
-						model.DeleteSubscription(feeds[num].Url, userID, isGroup)
-						mq.Unsubscribe(feeds[num].Url, userID)
+						model.DeleteSubscription(feeds[num].URL, userID, isGroup)
+						mm.UnSubscribe(feeds[num].URL, &model.User{Account: userID, IsGroup: isGroup})
 						ctx.Send("删除订阅成功！")
 						break
 					} else {
