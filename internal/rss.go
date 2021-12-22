@@ -22,11 +22,11 @@ func init() {
 			Transport: &http.Transport{
 				Proxy: http.ProxyURL(proxy),
 			},
-			Timeout: 10 * time.Second,
+			Timeout: 15 * time.Second,
 		}
 	} else {
 		fp.Client = &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 15 * time.Second,
 		}
 	}
 }
@@ -46,6 +46,7 @@ func checkMessage(url string, mm *message.Manager) {
 	feeds, err := fp.ParseURL(url)
 	if err != nil {
 		log.Errorf("解析订阅链接失败：%v", err)
+		return
 	}
 	checkRange := min(feeds.Len(), viper.GetInt("checkrange")) //限制检测条数
 	for i := 0; i < checkRange; i++ {
