@@ -75,7 +75,13 @@ func (q *QQ) HandleEvent(mm *message.Manager) {
 				ctx.Send("请输入合法的链接！")
 			} else {
 				isGroup, userID := getCtxInfo(ctx)
-				for _, existFeed := range model.QueryFeed(userID) {
+				feeds, err := model.QueryFeed(userID, isGroup)
+				if err != nil {
+					log.Errorf("查询订阅出现错误：%v", err)
+					ctx.Send("查询订阅出现未知错误，请联系管理员排查。")
+					return
+				}
+				for _, existFeed := range feeds {
 					if cmd.Args == existFeed.URL {
 						ctx.Send("您已经订阅了该地址！")
 						return
@@ -89,14 +95,24 @@ func (q *QQ) HandleEvent(mm *message.Manager) {
 					return
 				}
 				mm.Subscribe(cmd.Args, &model.User{Account: userID, IsGroup: isGroup})
-				model.InsertSubscription(cmd.Args, title, userID, isGroup)
+				err = model.InsertSubscription(cmd.Args, title, userID, isGroup)
+				if err != nil {
+					log.Errorf("插入订阅出现错误：%v", err)
+					ctx.Send("订阅出现未知错误，请联系管理员排查。")
+					return
+				}
 				ctx.Send(fmt.Sprintf("订阅《%s》成功！", title))
 			}
 		}
 	})
 	zero.OnCommandGroup([]string{"取消订阅", "unsubscribe"}).Handle(func(ctx *zero.Ctx) {
 		isGroup, userID := getCtxInfo(ctx)
-		feeds := model.QueryFeed(userID)
+		feeds, err := model.QueryFeed(userID, isGroup)
+		if err != nil {
+			log.Errorf("查询订阅出现错误：%v", err)
+			ctx.Send("查询订阅出现未知错误，请联系管理员排查。")
+			return
+		}
 		hasUrl, messageToSend := buildMessage(feeds, false)
 		if !hasUrl {
 			ctx.Send("您还没有任何订阅内容！")
@@ -112,7 +128,11 @@ func (q *QQ) HandleEvent(mm *message.Manager) {
 				} else {
 					num -= 1
 					if num >= 0 && num < len(feeds) {
-						model.DeleteSubscription(feeds[num].URL, userID, isGroup)
+						err := model.DeleteSubscription(feeds[num].URL, userID, isGroup)
+						if err != nil {
+							log.Errorf("删除订阅出现错误：%v", err)
+							return
+						}
 						mm.UnSubscribe(feeds[num].URL, &model.User{Account: userID, IsGroup: isGroup})
 						ctx.Send("删除订阅成功！")
 						break
@@ -124,9 +144,14 @@ func (q *QQ) HandleEvent(mm *message.Manager) {
 		}
 	})
 	zero.OnCommandGroup([]string{"查询订阅", "searchSubscription"}).Handle(func(ctx *zero.Ctx) {
-		_, userID := getCtxInfo(ctx)
-		urls := model.QueryFeed(userID)
-		hasUrl, messageToSend := buildMessage(urls, true)
+		isGroup, userID := getCtxInfo(ctx)
+		feeds, err := model.QueryFeed(userID, isGroup)
+		if err != nil {
+			log.Errorf("查询订阅出现错误：%v", err)
+			ctx.Send("查询订阅出现未知错误，请联系管理员排查。")
+			return
+		}
+		hasUrl, messageToSend := buildMessage(feeds, true)
 		if !hasUrl {
 			ctx.Send("您还没有任何订阅内容！")
 		} else {

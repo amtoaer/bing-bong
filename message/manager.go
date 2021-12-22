@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/amtoaer/bing-bong/model"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -33,7 +34,10 @@ func DefaultManager() *Manager {
 
 func (m *Manager) Init(bot Messager) {
 	m.bot = bot
-	users := model.QueryUser()
+	users, err := model.QueryUser()
+	if err != nil {
+		log.Fatalf("查询订阅关系出现错误：%v", err)
+	}
 	for i := range users {
 		user := users[i]
 		for j := range user.Feeds {
