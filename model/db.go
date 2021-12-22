@@ -1,118 +1,112 @@
 package model
 
 import (
-	"database/sql"
 	"fmt"
 
-	"github.com/amtoaer/bing-bong/message"
-	"github.com/amtoaer/bing-bong/utils"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-
-	_ "github.com/go-sql-driver/mysql"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-const (
-	queryHashSQL          = "select count(*) from hashes where hash = ?"
-	insertHashSQL         = "insert ignore into hashes (url,hash) values (?,?)"
-	querySubscriptionSQL  = "select url,subscriber,isGroup from subscriptions"
-	insertSubscriptionSQL = "insert into subscriptions (url,subscriber,isGroup) values (?,?,?)"
-	deleteSubscriptionSQL = "delete from subscriptions where url = ? and subscriber = ? and isGroup = ?"
-	queryFeedSQL          = "select f.url,f.name from feeds f join subscriptions s on f.url=s.url and s.subscriber = ?"
-	insertFeedSQL         = "replace into feeds (url,name) values (?,?)"
-)
-
-var (
-	innerDB                                                   *sql.DB
-	querySubscription, insertSubscription, deleteSubscription *sql.Stmt
-	queryHash, insertHash, queryFeed, insertFeed              *sql.Stmt
-)
-
-type Feed struct {
-	Url, Name string
-}
+var db *gorm.DB
 
 // 初始化数据库链接
 func InitDB() {
 	var (
-		err  error
-		errs []error = make([]error, 7)
+		dialector gorm.Dialector
+		err       error
 	)
-	address := fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4",
-		viper.GetString("dbUser"), viper.GetString("dbPass"),
-		viper.GetString("dbAddress"), viper.GetString("dbName"))
-	innerDB, err = sql.Open("mysql", address)
+	switch viper.GetString("dbType") {
+	case "mysql":
+		{
+			conf := viper.GetStringMapString("mysql")
+			address := fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4",
+				conf["dbUser"], conf["dbPass"],
+				conf["dbAddress"], conf["dbName"])
+			dialector = mysql.Open(address)
+		}
+	case "sqlite":
+		{
+			conf := viper.GetStringMapString("sqlite")
+			dialector = sqlite.Open(conf["path"])
+		}
+	default:
+		log.Fatal("不支持的数据库类型")
+	}
+	db, err = gorm.Open(dialector, &gorm.Config{})
 	if err != nil {
-		panic(fmt.Errorf("error opening db connection:%v", err))
+		log.Fatalf("打开数据库失败：%v", err)
 	}
-	if err = innerDB.Ping(); err != nil {
-		panic(fmt.Errorf("error ping db connection:%v", err))
+	db.AutoMigrate(&User{}, &Feed{}, &Summary{})
+	if err != nil {
+		log.Fatalf("初始化数据库失败：%v", err)
 	}
-	queryHash, errs[0] = innerDB.Prepare(queryHashSQL)
-	insertHash, errs[1] = innerDB.Prepare(insertHashSQL)
-	querySubscription, errs[2] = innerDB.Prepare(querySubscriptionSQL)
-	insertSubscription, errs[3] = innerDB.Prepare(insertSubscriptionSQL)
-	deleteSubscription, errs[4] = innerDB.Prepare(deleteSubscriptionSQL)
-	queryFeed, errs[5] = innerDB.Prepare(queryFeedSQL)
-	insertFeed, errs[6] = innerDB.Prepare(insertFeedSQL)
-	utils.Fatalf("error constructing prepared statement:%v", errs...)
 }
 
-// 判断文章是否已经推送
-func IsFeedExist(hash string) bool {
-	var count int
-	queryHash.QueryRow(hash).Scan(&count)
+// 查询文章是否已经存在
+func IsFeedExist(hashStr string) bool {
+	var count int64
+	db.Table("summaries").Where("hash = ?", hashStr).Count(&count)
 	return count > 0
 }
 
 // 插入已经推送的hash
-func InsertHash(url, hash string) {
-	_, err := insertHash.Exec(url, hash)
-	utils.Errorf("error inserting feed:%v", err)
+func InsertHash(hashStr string) error {
+	return db.Clauses(clause.OnConflict{DoNothing: true}).Create(&Summary{Hash: hashStr}).Error
 }
 
-func QueryFeed(account int64) []*Feed {
-	var (
-		url, name string
-		result    []*Feed
-	)
-	rows, err := queryFeed.Query(account)
-	if utils.Errorf("error querying urls:%v", err) {
-		return result
+// 查询某人订阅的feeds
+func QueryFeed(account int64, isGroup bool) (result []*Feed, err error) {
+	user := &User{
+		Account: account,
+		IsGroup: isGroup,
 	}
-	defer rows.Close()
-	for rows.Next() {
-		rows.Scan(&url, &name)
-		result = append(result, &Feed{url, name})
-	}
-	return result
+	db.Where(user).FirstOrCreate(user)
+	err = db.Model(&user).Association("Feeds").Find(&result)
+	return
 }
 
-// 初始化消息队列（即查询订阅者并遍历订阅）
-func InitMessageQueue(bot message.Messager, mq *message.MessageQueue) {
-	var (
-		url     string
-		account int64
-		isGroup bool
-	)
-	rows, err := querySubscription.Query()
-	if utils.Errorf("error querying subscriber:%v", err) {
-		return
-	}
-	defer rows.Close()
-	for rows.Next() {
-		rows.Scan(&url, &account, &isGroup)
-		mq.Subscribe(bot, url, account, isGroup)
-	}
+// 查询带有订阅关系的用户列表
+func QueryUser() (users []User, err error) {
+	err = db.Preload("Feeds").Find(&users).Error
+	return
 }
 
-// 插入订阅者
-func InsertSubscription(url, name string, account int64, isGroup bool) {
-	_, insertUrlErr := insertFeed.Exec(url, name)
-	_, insertSubscriberErr := insertSubscription.Exec(url, account, isGroup)
-	utils.Errorf("error inserting subscriber:%v", insertUrlErr, insertSubscriberErr)
+func Search() (feeds []Feed) {
+	db.Table("feeds").Find(&feeds)
+	return
 }
 
-func DeleteSubscription(url string, account int64, isGroup bool) {
-	_, err := deleteSubscription.Exec(url, account, isGroup)
-	utils.Errorf("error deleting subscription:%v", err)
+// 插入订阅关系
+func InsertSubscription(url, name string, account int64, isGroup bool) error {
+	user := &User{
+		Account: account,
+		IsGroup: isGroup,
+	}
+	feed := &Feed{
+		URL:  url,
+		Name: name,
+	}
+	db.Where(user).FirstOrCreate(user)
+	db.Clauses(clause.OnConflict{ // 插入订阅时有可能出现链接对应的网站名称变更，冲突时仅更新网站名称
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Where(feed).FirstOrCreate(feed)
+	return db.Model(user).Association("Feeds").Append(feed)
+}
+
+// 删除订阅关系
+func DeleteSubscription(url string, account int64, isGroup bool) error {
+	user := &User{
+		Account: account,
+		IsGroup: isGroup,
+	}
+	feed := &Feed{
+		URL: url,
+	}
+	db.Where(user).FirstOrCreate(user)
+	db.Where(feed).FirstOrCreate(feed)
+	return db.Model(user).Association("Feeds").Delete(feed)
 }

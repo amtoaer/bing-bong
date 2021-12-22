@@ -11,14 +11,14 @@ import (
 type robot interface {
 	Init()
 	SendMessage(int64, string, bool)
-	HandleEvent(*message.MessageQueue)
+	HandleEvent(*message.Manager)
 }
 
 func main() {
 	var (
-		bot     robot                  //机器人实例
-		mq      = message.Default()    //消息队列
-		botConf map[string]interface{} //机器人配置
+		bot     robot                      //机器人实例
+		mm      = message.DefaultManager() //消息队列
+		botConf map[string]interface{}     //机器人配置
 	)
 	// 根据机器人类型决定实例化内容
 	switch viper.GetString("botType") {
@@ -28,10 +28,12 @@ func main() {
 	}
 	// 登录机器人
 	bot.Init()
-	// 从数据库读取订阅信息初始化消息队列
-	model.InitMessageQueue(bot, mq)
+	// 初始化数据库链接
+	model.InitDB()
+	// 从数据库读取订阅信息初始化消息队列，同时启动消息监听
+	mm.Init(bot)
 	// 开始检测rss更新
-	go internal.CheckMessage(mq)
+	go internal.CheckMessage(mm)
 	// 启动机器人外部事件监听
-	bot.HandleEvent(mq)
+	bot.HandleEvent(mm)
 }
