@@ -16,19 +16,23 @@ bing-bong 是一个用于订阅 rss 的 QQ（？）机器人。理论上任何�
 
 ## 配置
 
-首先需要执行`db.sql`初始化数据库，接着参考 config.yml 文件的内容修改配置并运行。
+参考 config.yml 文件的内容修改配置并运行。
 
 ```yml
-botType: qq # 机器人类型
+botType: "qq" # 机器人类型
 qq:
   account: "123456" # QQ账号
   webSocket: "ws://127.0.0.1:6700/" #cq-http的正向ws地址
   accessToken: "123456" # cq-http的token
-dbAddress: "localhost:3306" # 数据库链接（目前仅支持mysql）
-dbUser: root # 数据库账号
-dbPass: root # 数据库密码
-dbName: bingbong # 数据库名
-proxy: "" # 请求rss地址时使用的代理（例：http://localhost:7890，留空表示无代理）
+dbType: "sqlite" # 使用的数据库类型
+mysql:
+  dbAddress: "localhost:3306" # 数据库链接
+  dbUser: "root" # 数据库账号
+  dbPass: "root" # 数据库密码
+  dbName: "bingbong" # 数据库名
+sqlite:
+  path: "./sqlite.db" # 数据库位置
+proxy: "" # 请求rss地址时使用的 http 代理（例：http://localhost:7890，留空表示无代理）
 checkTime: 5 # 检测rss订阅的时间间隔（单位分钟）
 checkRange: 5 # 检测rss订阅的最大条数（程序会检测rss地址的前min(checkRange,len(feeds))条消息）
 ```
@@ -58,15 +62,3 @@ type robot interface {
 关于机器人配置的注入方式，可参考 QQ 在`main.go` 中的实现。
 
 对于其它开发者，可修改对应文件并提交 PR。
-
-## 缺陷
-
-这个项目只是我实习工作之余写的一个小工具，现在还有着不少缺陷（当然凑合用是够了 XD），目前已知的有：
-
-1. 同一用户订阅多个 url 时会起多个协程监听消息，或许可以考虑合并。
-
-2. 用户需要手动执行 db.sql 初始化数据库，可以考虑整合到程序中。
-
-3. 数据库表的结构有些奇怪，重新设计可能会提高性能。
-
-4. 当前数据库初始化方式不适合进行单测，将来也许要部分重构。

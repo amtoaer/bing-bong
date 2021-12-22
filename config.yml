@@ -5,7 +5,7 @@ qq:
   accessToken: "123456" # cq-http的token
 dbType: "sqlite" # 数据库类型
 mysql:
-  dbAddress: "localhost:3306" # 数据库链接（目前仅支持mysql）
+  dbAddress: "localhost:3306" # 数据库链接
   dbUser: "root" # 数据库账号
   dbPass: "root" # 数据库密码
   dbName: "bingbong" # 数据库名
