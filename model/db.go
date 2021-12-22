@@ -8,6 +8,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var db *gorm.DB
@@ -54,36 +55,58 @@ func IsFeedExist(hashStr string) bool {
 
 // 插入已经推送的hash
 func InsertHash(hashStr string) error {
-	return db.Create(&Summary{Hash: hashStr}).Error
+	return db.Clauses(clause.OnConflict{DoNothing: true}).Create(&Summary{Hash: hashStr}).Error
 }
 
 // 查询某人订阅的feeds
-func QueryFeed(account int64) (result []*Feed) {
-	db.Table("users").Where("account = ?", account).Association("Feeds").Find(&result)
-	return result
+func QueryFeed(account int64, isGroup bool) (result []*Feed, err error) {
+	user := &User{
+		Account: account,
+		IsGroup: isGroup,
+	}
+	db.Where(user).FirstOrCreate(user)
+	err = db.Model(&user).Association("Feeds").Find(&result)
+	return
 }
 
 // 查询带有订阅关系的用户列表
-func QueryUser() (users []User) {
-	db.Preload("Feeds").Find(&users)
+func QueryUser() (users []User, err error) {
+	err = db.Preload("Feeds").Find(&users).Error
+	return
+}
+
+func Search() (feeds []Feed) {
+	db.Table("feeds").Find(&feeds)
 	return
 }
 
 // 插入订阅关系
 func InsertSubscription(url, name string, account int64, isGroup bool) error {
-	return db.Where(&User{
+	user := &User{
 		Account: account,
 		IsGroup: isGroup,
-	}).Association("Feeds").Append(&Feed{
+	}
+	feed := &Feed{
 		URL:  url,
 		Name: name,
-	})
+	}
+	db.Where(user).FirstOrCreate(user)
+	db.Clauses(clause.OnConflict{ // 插入订阅时有可能出现链接对应的网站名称变更，冲突时仅更新网站名称
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Where(feed).FirstOrCreate(feed)
+	return db.Model(user).Association("Feeds").Append(feed)
 }
 
 // 删除订阅关系
-func DeleteSubscription(url string, account int64, isGroup bool) {
-	db.Where(&User{
+func DeleteSubscription(url string, account int64, isGroup bool) error {
+	user := &User{
 		Account: account,
 		IsGroup: isGroup,
-	}).Association("Feeds").Delete(&Feed{URL: url})
+	}
+	feed := &Feed{
+		URL: url,
+	}
+	db.Where(user).FirstOrCreate(user)
+	db.Where(feed).FirstOrCreate(feed)
+	return db.Model(user).Association("Feeds").Delete(feed)
 }
