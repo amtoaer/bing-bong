@@ -11,6 +11,7 @@ mysql:
   dbName: "bingbong" # 数据库名
 sqlite:
   path: "./sqlite.db" # 数据库位置
+log: "bing-bong.log" # 机器人日志文件名
 proxy: "" # 请求rss地址时使用的代理（例：http://localhost:7890，留空表示无代理）
 checkTime: 5 # 检测rss订阅的时间间隔（单位分钟）
 checkRange: 5 # 检测rss订阅的最大条数（程序会检测rss地址的前min(checkRange,len(feeds))条消息）

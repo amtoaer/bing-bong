@@ -3,7 +3,7 @@ package model
 import (
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/amtoaer/bing-bong/utils"
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
@@ -34,15 +34,15 @@ func InitDB() {
 			dialector = sqlite.Open(conf["path"])
 		}
 	default:
-		log.Fatal("不支持的数据库类型")
+		utils.Fatal("不支持的数据库类型")
 	}
 	db, err = gorm.Open(dialector, &gorm.Config{})
 	if err != nil {
-		log.Fatalf("打开数据库失败：%v", err)
+		utils.Fatalf("打开数据库失败：%v", err)
 	}
 	db.AutoMigrate(&User{}, &Feed{}, &Summary{})
 	if err != nil {
-		log.Fatalf("初始化数据库失败：%v", err)
+		utils.Fatalf("初始化数据库失败：%v", err)
 	}
 }
 

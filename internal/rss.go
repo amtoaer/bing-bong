@@ -9,7 +9,6 @@ import (
 	"github.com/amtoaer/bing-bong/model"
 	"github.com/amtoaer/bing-bong/utils"
 	"github.com/mmcdole/gofeed"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -45,7 +44,7 @@ func CheckMessage(mm *message.Manager) {
 func checkMessage(url string, mm *message.Manager) {
 	feeds, err := fp.ParseURL(url)
 	if err != nil {
-		log.Errorf("解析订阅链接失败：%v", err)
+		utils.Errorf("解析订阅链接失败：%v", err)
 		return
 	}
 	checkRange := min(feeds.Len(), viper.GetInt("checkrange")) //限制检测条数

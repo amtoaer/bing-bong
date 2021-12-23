@@ -1,8 +1,7 @@
 package model
 
 import (
-	log "github.com/sirupsen/logrus"
-
+	"github.com/amtoaer/bing-bong/utils"
 	"github.com/spf13/viper"
 )
 
@@ -11,6 +10,6 @@ func init() {
 	viper.SetConfigName("config")
 	viper.AddConfigPath(".")
 	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("读取配置文件失败：%v", err)
+		utils.Fatalf("读取配置文件失败：%v", err)
 	}
 }

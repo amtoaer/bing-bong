@@ -11,7 +11,7 @@ import (
 	"github.com/amtoaer/bing-bong/internal"
 	"github.com/amtoaer/bing-bong/message"
 	"github.com/amtoaer/bing-bong/model"
-	log "github.com/sirupsen/logrus"
+	"github.com/amtoaer/bing-bong/utils"
 	zero "github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/driver"
 	"github.com/wdvxdr1123/ZeroBot/extension"
@@ -37,14 +37,14 @@ func (q *QQ) Init() {
 	})
 	accountNum, err := strconv.ParseInt(account, 10, 64)
 	if err != nil {
-		log.Fatalf("解析账号失败：%v", err)
+		utils.Fatalf("解析账号失败：%v", err)
 	}
 	time.Sleep(100 * time.Millisecond) // zero内部的机器人注册是异步的，这里暂且使用sleep等待0.1s，防止zero.GetBot为nil
 	q.bot = zero.GetBot(accountNum)
 	if q.bot != nil {
-		log.Info("机器人成功启动")
+		utils.Info("机器人成功启动")
 	} else {
-		log.Fatal("机器人启动失败")
+		utils.Fatal("机器人启动失败")
 	}
 }
 
@@ -64,7 +64,7 @@ func (q *QQ) HandleEvent(mm *message.Manager) {
 		var cmd extension.CommandModel
 		err := ctx.Parse(&cmd)
 		if err != nil {
-			log.Errorf("处理命令失败：%v", err)
+			utils.Errorf("处理命令失败：%v", err)
 			return
 		}
 		if cmd.Args == "" {
@@ -76,7 +76,7 @@ func (q *QQ) HandleEvent(mm *message.Manager) {
 				isGroup, userID := getCtxInfo(ctx)
 				feeds, err := model.QueryFeed(userID, isGroup)
 				if err != nil {
-					log.Errorf("查询订阅出现错误：%v", err)
+					utils.Errorf("查询订阅出现错误：%v", err)
 					ctx.Send("查询订阅出现未知错误，请联系管理员排查。")
 					return
 				}
@@ -89,14 +89,14 @@ func (q *QQ) HandleEvent(mm *message.Manager) {
 				ctx.Send("获取feeds信息中...")
 				title, err := internal.ParseTitle(cmd.Args)
 				if err != nil {
-					log.Errorf("获取订阅标题失败：%v", err)
+					utils.Errorf("获取订阅标题失败：%v", err)
 					ctx.Send("获取信息失败，请检查机器人网络并确保网址为rss地址。")
 					return
 				}
 				mm.Subscribe(cmd.Args, &model.User{Account: userID, IsGroup: isGroup})
 				err = model.InsertSubscription(cmd.Args, title, userID, isGroup)
 				if err != nil {
-					log.Errorf("插入订阅出现错误：%v", err)
+					utils.Errorf("插入订阅出现错误：%v", err)
 					ctx.Send("订阅出现未知错误，请联系管理员排查。")
 					return
 				}
@@ -108,7 +108,7 @@ func (q *QQ) HandleEvent(mm *message.Manager) {
 		isGroup, userID := getCtxInfo(ctx)
 		feeds, err := model.QueryFeed(userID, isGroup)
 		if err != nil {
-			log.Errorf("查询订阅出现错误：%v", err)
+			utils.Errorf("查询订阅出现错误：%v", err)
 			ctx.Send("查询订阅出现未知错误，请联系管理员排查。")
 			return
 		}
@@ -129,7 +129,7 @@ func (q *QQ) HandleEvent(mm *message.Manager) {
 					if num >= 0 && num < len(feeds) {
 						err := model.DeleteSubscription(feeds[num].URL, userID, isGroup)
 						if err != nil {
-							log.Errorf("删除订阅出现错误：%v", err)
+							utils.Errorf("删除订阅出现错误：%v", err)
 							return
 						}
 						mm.UnSubscribe(feeds[num].URL, &model.User{Account: userID, IsGroup: isGroup})
@@ -146,7 +146,7 @@ func (q *QQ) HandleEvent(mm *message.Manager) {
 		isGroup, userID := getCtxInfo(ctx)
 		feeds, err := model.QueryFeed(userID, isGroup)
 		if err != nil {
-			log.Errorf("查询订阅出现错误：%v", err)
+			utils.Errorf("查询订阅出现错误：%v", err)
 			ctx.Send("查询订阅出现未知错误，请联系管理员排查。")
 			return
 		}
