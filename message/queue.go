@@ -38,6 +38,12 @@ func (m *Queue) overwrite(topic string, receiverList []chan string) {
 	m.lock.Unlock()
 }
 
+func (m *Queue) delete(topic string) {
+	m.lock.Lock()
+	delete(m.mq, topic)
+	m.lock.Unlock()
+}
+
 // 内部的消息广播实现
 func (m *Queue) broadcast(message string, receiverList []chan string) {
 	alert := func(receiver chan string) {
@@ -71,7 +77,12 @@ func (m *Queue) Unsubscribe(topic string, channel chan string) error {
 	for index := range receiverList {
 		receiverChan := receiverList[index]
 		if receiverChan == channel {
-			m.overwrite(topic, append(receiverList[:index], receiverList[index+1:]...))
+			newList := append(receiverList[:index], receiverList[index+1:]...)
+			if len(newList) > 0 {
+				m.overwrite(topic, newList)
+			} else { // 某topic无订阅者则直接删除topic
+				m.delete(topic)
+			}
 		}
 	}
 	return nil
