@@ -15,19 +15,14 @@ import (
 var fp *gofeed.Parser = gofeed.NewParser()
 
 func init() {
+	fp.Client = &http.Client{}
 	proxyUrl := viper.GetString("proxy")
 	if proxy, err := url.ParseRequestURI(proxyUrl); err == nil {
-		fp.Client = &http.Client{
-			Transport: &http.Transport{
-				Proxy: http.ProxyURL(proxy),
-			},
-			Timeout: 15 * time.Second,
-		}
-	} else {
-		fp.Client = &http.Client{
-			Timeout: 15 * time.Second,
+		fp.Client.Transport = &http.Transport{
+			Proxy: http.ProxyURL(proxy),
 		}
 	}
+	fp.Client.Timeout = 15 * time.Second
 }
 
 // 检测rss更新的定时任务
